@@ -4,6 +4,8 @@ import (
 	"encoding/json"
 	"log"
 	"net/http"
+	"policyAuth/internal/database"
+	"policyAuth/internal/server/handlers"
 	"time"
 )
 
@@ -47,6 +49,24 @@ func (s *Server) RegisterRoutes() http.Handler {
 	mux := http.NewServeMux()
 	mux.HandleFunc("/", s.HelloWorldHandler)
 	mux.Handle("/health", JWTMiddleware(http.HandlerFunc(s.healthHandler)))
+	mux.HandleFunc("/auth", AuthHandler) // Add this line to register the new route
+
+  userHandler := &handlers.UserHandler{DB: database.DBInstance.DB}
+	// User routes
+	mux.HandleFunc("/users", func(w http.ResponseWriter, r *http.Request) {
+		switch r.Method {
+		case http.MethodGet:
+			userHandler.GetUsers(w, r)
+		case http.MethodPost:
+			userHandler.CreateUser(w, r)
+		case http.MethodPut:
+			userHandler.UpdateUser(w, r)
+		case http.MethodDelete:
+			userHandler.DeleteUser(w, r)
+		default:
+			http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		}
+	})
 
 	// Wrap the mux with the logging middleware
 	return LoggingMiddleware(mux)
@@ -66,11 +86,9 @@ func (s *Server) HelloWorldHandler(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) healthHandler(w http.ResponseWriter, r *http.Request) {
 	jsonResp, err := json.Marshal(s.db.Health())
-
 	if err != nil {
 		log.Fatalf("error handling JSON marshal. Err: %v", err)
 	}
 
 	_, _ = w.Write(jsonResp)
 }
-

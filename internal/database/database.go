@@ -13,19 +13,87 @@ import (
 	_ "github.com/joho/godotenv/autoload"
 )
 
+func InitSchema(db *sql.DB) {
+	createTableQuery := `
+-- Table for users
+CREATE TABLE IF NOT EXISTS pds_users (
+    user_id SERIAL PRIMARY KEY,
+    username VARCHAR(50) UNIQUE NOT NULL,
+    password VARCHAR(50) NOT NULL
+);
+
+-- Table for roles
+CREATE TABLE IF NOT EXISTS pds_roles (
+    role_id SERIAL PRIMARY KEY,
+    role_name VARCHAR(50) UNIQUE NOT NULL
+);
+
+-- Table for permissions
+CREATE TABLE IF NOT EXISTS pds_permissions (
+    permission_id SERIAL PRIMARY KEY,
+    permission_name VARCHAR(50) UNIQUE NOT NULL
+);
+
+-- Table for resources
+CREATE TABLE IF NOT EXISTS pds_resources (
+    resource_id SERIAL PRIMARY KEY,
+    resource_name VARCHAR(50) UNIQUE NOT NULL
+);
+
+-- Table for role assignments
+CREATE TABLE IF NOT EXISTS pds_user_roles (
+    user_id INT REFERENCES pds_users(user_id),
+    role_id INT REFERENCES pds_roles(role_id),
+    PRIMARY KEY (user_id, role_id)
+);
+
+-- Table for resource-role mappings
+CREATE TABLE IF NOT EXISTS pds_resource_role (
+    resource_id INT REFERENCES pds_resources(resource_id),
+    role_id INT REFERENCES pds_roles(role_id),
+    PRIMARY KEY (resource_id, role_id)
+);
+
+-- Table for resource-permission mappings
+CREATE TABLE IF NOT EXISTS pds_resource_permission (
+    resource_id INT REFERENCES pds_resources(resource_id),
+    permission_id INT REFERENCES pds_permissions(permission_id),
+    PRIMARY KEY (resource_id, permission_id)
+);
+
+-- Table for role-permission mappings
+CREATE TABLE IF NOT EXISTS pds_roles_permissions (
+    role_id INT REFERENCES pds_roles(role_id),
+    permission_id INT REFERENCES pds_permissions(permission_id),
+    PRIMARY KEY (role_id, permission_id)
+);
+
+  INSERT INTO pds_roles (role_name) VALUES
+		('admin'),
+		('user')
+	ON CONFLICT (role_name) DO NOTHING;
+	`
+
+	_, err := db.Exec(createTableQuery)
+	if err != nil {
+		log.Fatalf("Failed to create table: %v", err)
+	}
+
+}
+
+
 // Service represents a service that interacts with a database.
 type Service interface {
 	// Health returns a map of health status information.
 	// The keys and values in the map are service-specific.
 	Health() map[string]string
-
 	// Close terminates the database connection.
 	// It returns an error if the connection cannot be closed.
 	Close() error
 }
 
-type service struct {
-	db *sql.DB
+type StructService struct {
+	DB *sql.DB
 }
 
 var (
@@ -35,35 +103,37 @@ var (
 	port       = os.Getenv("DB_PORT")
 	host       = os.Getenv("DB_HOST")
 	schema     = os.Getenv("DB_SCHEMA")
-	dbInstance *service
+	DBInstance *StructService
 )
 
 func New() Service {
 	// Reuse Connection
-	if dbInstance != nil {
-		return dbInstance
+	if DBInstance != nil {
+		return DBInstance
 	}
 	connStr := fmt.Sprintf("postgres://%s:%s@%s:%s/%s?sslmode=disable&search_path=%s", username, password, host, port, database, schema)
+  	fmt.Println("The connection string is ", connStr)
+
 	db, err := sql.Open("pgx", connStr)
 	if err != nil {
 		log.Fatal(err)
 	}
-	dbInstance = &service{
-		db: db,
+	DBInstance = &StructService{
+		DB: db,
 	}
-	return dbInstance
+	return DBInstance
 }
 
 // Health checks the health of the database connection by pinging the database.
 // It returns a map with keys indicating various health statistics.
-func (s *service) Health() map[string]string {
+func (s *StructService) Health() map[string]string {
 	ctx, cancel := context.WithTimeout(context.Background(), 1*time.Second)
 	defer cancel()
 
 	stats := make(map[string]string)
 
 	// Ping the database
-	err := s.db.PingContext(ctx)
+	err := s.DB.PingContext(ctx)
 	if err != nil {
 		stats["status"] = "down"
 		stats["error"] = fmt.Sprintf("db down: %v", err)
@@ -76,7 +146,7 @@ func (s *service) Health() map[string]string {
 	stats["message"] = "It's healthy"
 
 	// Get database stats (like open connections, in use, idle, etc.)
-	dbStats := s.db.Stats()
+	dbStats := s.DB.Stats()
 	stats["open_connections"] = strconv.Itoa(dbStats.OpenConnections)
 	stats["in_use"] = strconv.Itoa(dbStats.InUse)
 	stats["idle"] = strconv.Itoa(dbStats.Idle)
@@ -109,7 +179,7 @@ func (s *service) Health() map[string]string {
 // It logs a message indicating the disconnection from the specific database.
 // If the connection is successfully closed, it returns nil.
 // If an error occurs while closing the connection, it returns the error.
-func (s *service) Close() error {
+func (s *StructService) Close() error {
 	log.Printf("Disconnected from database: %s", database)
-	return s.db.Close()
+	return s.DB.Close()
 }

@@ -21,9 +21,12 @@ func NewServer() *http.Server {
 	InitKeycloak()
 
 	port, _ := strconv.Atoi(os.Getenv("PORT"))
+	dbService := database.New()
+	database.InitSchema(database.DBInstance.DB) // Initialize the database schema
+
 	NewServer := &Server{
 		port: port,
-		db:   database.New(),
+		db:   dbService,
 	}
 	fmt.Println("Server is running on port: ", port)
 
@@ -38,4 +41,3 @@ func NewServer() *http.Server {
 
 	return server
 }
-
