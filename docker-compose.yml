@@ -19,10 +19,10 @@ services:
       DB_DATABASE: ${DB_DATABASE}
       DB_USER: ${DB_USERNAME}
       DB_PASSWORD: ${DB_PASSWORD}
-      KEYCLOAK_USER: ${KEYCLOAK_USER}
-      KEYCLOAK_PASSWORD: ${KEYCLOAK_PASSWORD}
+      KEYCLOAK_ADMIN: ${KEYCLOAK_USER}
+      KEYCLOAK_ADMIN_PASSWORD: ${KEYCLOAK_PASSWORD}
     ports:
-      - "8080:8080"
+      - "${KEYCLOAK_PORT}:8080"
     depends_on:
       - psql
     command: ["start-dev"]

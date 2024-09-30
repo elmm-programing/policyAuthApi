@@ -2,12 +2,13 @@ package server
 
 import (
 	"context"
+	"fmt"
 	"net/http"
 	"os"
 	"strings"
 
-	"github.com/dgrijalva/jwt-go"
 	"github.com/Nerzal/gocloak/v13"
+	"github.com/dgrijalva/jwt-go"
 )
 
 var (
@@ -18,7 +19,7 @@ var (
 )
 
 func InitKeycloak() {
-	keycloakClient = gocloak.NewClient(os.Getenv("KEYCLOAK_URL"))
+  keycloakClient = gocloak.NewClient(fmt.Sprintf("%v:%v", os.Getenv("KEYCLOAK_URL"),os.Getenv("KEYCLOAK_PORT")))
 	realm = os.Getenv("KEYCLOAK_REALM")
 	clientID = os.Getenv("KEYCLOAK_CLIENT_ID")
 	clientSecret = os.Getenv("KEYCLOAK_CLIENT_SECRET")
