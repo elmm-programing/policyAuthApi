@@ -2,42 +2,41 @@ package server
 
 import (
 	"fmt"
-	"net/http"
 	"os"
 	"strconv"
-	"time"
-
-	_ "github.com/joho/godotenv/autoload"
 
 	"policyAuth/internal/database"
+
+	"github.com/gofiber/fiber/v2"
+	_ "github.com/joho/godotenv/autoload"
 )
 
 type Server struct {
 	port int
 	db   database.Service
+	app  *fiber.App
 }
 
-func NewServer() *http.Server {
+func NewServer() *Server {
 	InitKeycloak()
 
 	port, _ := strconv.Atoi(os.Getenv("PORT"))
 	dbService := database.New()
 	database.InitSchema(database.DBInstance.DB) // Initialize the database schema
 
-	NewServer := &Server{
+	app := fiber.New()
+
+	server := &Server{
 		port: port,
 		db:   dbService,
+		app:  app,
 	}
-	fmt.Println("Server is running on port: ", port)
 
-	// Declare Server config
-	server := &http.Server{
-		Addr:         fmt.Sprintf(":%d", NewServer.port),
-		Handler:      NewServer.RegisterRoutes(),
-		IdleTimeout:  time.Minute,
-		ReadTimeout:  10 * time.Second,
-		WriteTimeout: 30 * time.Second,
-	}
+	server.RegisterRoutes()
 
 	return server
+}
+
+func (s *Server) Start() error {
+	return s.app.Listen(fmt.Sprintf(":%d", s.port))
 }

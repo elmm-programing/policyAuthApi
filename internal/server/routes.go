@@ -1,94 +1,59 @@
 package server
 
 import (
-	"encoding/json"
-	"log"
-	"net/http"
 	"policyAuth/internal/database"
 	"policyAuth/internal/server/handlers"
-	"time"
+	"policyAuth/internal/server/handlers/relations"
 )
 
-// LoggingMiddleware logs the incoming HTTP requests and responses
-func LoggingMiddleware(next http.Handler) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		start := time.Now()
-		log.Printf("Started %s %s", r.Method, r.URL.Path)
+func (s *Server) RegisterRoutes() {
+	s.app.Get("/", s.HelloWorldHandler)
+	s.app.Get("/health", JWTMiddleware(s.healthHandler))
+	s.app.Post("/auth", AuthHandler)
 
-		// Create a response writer to capture the status code and response size
-		lrw := &loggingResponseWriter{ResponseWriter: w}
-		next.ServeHTTP(lrw, r)
-
-		log.Printf("Completed %s %s in %v with status %d and size %d",
-			r.Method, r.URL.Path, time.Since(start), lrw.statusCode, lrw.size)
-	})
-}
-
-// loggingResponseWriter is a custom response writer to capture status code and response size
-type loggingResponseWriter struct {
-	http.ResponseWriter
-	statusCode int
-	size       int
-}
-
-func (lrw *loggingResponseWriter) WriteHeader(code int) {
-	lrw.statusCode = code
-	lrw.ResponseWriter.WriteHeader(code)
-}
-
-func (lrw *loggingResponseWriter) Write(b []byte) (int, error) {
-	if lrw.statusCode == 0 {
-		lrw.statusCode = http.StatusOK
-	}
-	size, err := lrw.ResponseWriter.Write(b)
-	lrw.size += size
-	return size, err
-}
-
-func (s *Server) RegisterRoutes() http.Handler {
-	mux := http.NewServeMux()
-	mux.HandleFunc("/", s.HelloWorldHandler)
-	mux.Handle("/health", JWTMiddleware(http.HandlerFunc(s.healthHandler)))
-	mux.HandleFunc("/auth", AuthHandler) // Add this line to register the new route
-
-  userHandler := &handlers.UserHandler{DB: database.DBInstance.DB}
+	userHandler := &handlers.UserHandler{DB: database.DBInstance.DB}
 	// User routes
-	mux.HandleFunc("/users", func(w http.ResponseWriter, r *http.Request) {
-		switch r.Method {
-		case http.MethodGet:
-			userHandler.GetUsers(w, r)
-		case http.MethodPost:
-			userHandler.CreateUser(w, r)
-		case http.MethodPut:
-			userHandler.UpdateUser(w, r)
-		case http.MethodDelete:
-			userHandler.DeleteUser(w, r)
-		default:
-			http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
-		}
-	})
+	s.app.Get("/users", userHandler.GetUsers)
+	s.app.Post("/users", userHandler.CreateUser)
+	s.app.Put("/users", userHandler.UpdateUser)
+	s.app.Delete("/users", userHandler.DeleteUser)
 
-	// Wrap the mux with the logging middleware
-	return LoggingMiddleware(mux)
-}
+	roleHandler := &handlers.RoleHandler{DB: database.DBInstance.DB}
+	// Role routes
+	s.app.Get("/roles", roleHandler.GetRoles)
+	s.app.Post("/roles", roleHandler.CreateRole)
+	s.app.Put("/roles", roleHandler.UpdateRole)
+	s.app.Delete("/roles", roleHandler.DeleteRole)
 
-func (s *Server) HelloWorldHandler(w http.ResponseWriter, r *http.Request) {
-	resp := make(map[string]string)
-	resp["message"] = "Hello World"
+	permissionHandler := &handlers.PermissionHandler{DB: database.DBInstance.DB}
+	// Permission routes
+	s.app.Get("/permissions", permissionHandler.GetPermissions)
+	s.app.Post("/permissions", permissionHandler.CreatePermission)
+	s.app.Put("/permissions", permissionHandler.UpdatePermission)
+	s.app.Delete("/permissions", permissionHandler.DeletePermission)
 
-	jsonResp, err := json.Marshal(resp)
-	if err != nil {
-		log.Fatalf("error handling JSON marshal. Err: %v", err)
-	}
+	resourceHandler := &handlers.ResourceHandler{DB: database.DBInstance.DB}
+	// Resource routes
+	s.app.Get("/resources", resourceHandler.GetResources)
+	s.app.Post("/resources", resourceHandler.CreateResource)
+	s.app.Put("/resources", resourceHandler.UpdateResource)
+	s.app.Delete("/resources", resourceHandler.DeleteResource)
 
-	_, _ = w.Write(jsonResp)
-}
+	userRoleHandler := &relations.UserRoleHandler{DB: database.DBInstance.DB}
+	// UserRole routes
+	s.app.Get("/user_roles", userRoleHandler.GetUserRoles)
+	s.app.Post("/user_roles", userRoleHandler.CreateUserRole)
+	s.app.Delete("/user_roles", userRoleHandler.DeleteUserRole)
 
-func (s *Server) healthHandler(w http.ResponseWriter, r *http.Request) {
-	jsonResp, err := json.Marshal(s.db.Health())
-	if err != nil {
-		log.Fatalf("error handling JSON marshal. Err: %v", err)
-	}
+	resourceRoleHandler := &relations.ResourceRoleHandler{DB: database.DBInstance.DB}
+	// ResourceRole routes
+	s.app.Get("/resource_roles", resourceRoleHandler.GetResourceRoles)
+	s.app.Post("/resource_roles", resourceRoleHandler.CreateResourceRole)
+	s.app.Delete("/resource_roles/:id", resourceRoleHandler.DeleteResourceRole)
 
-	_, _ = w.Write(jsonResp)
+	roleResourcePermissionHandler := &relations.RoleResourcePermissionHandler{DB: database.DBInstance.DB}
+	// RoleResourcePermission routes
+	s.app.Get("/role_resource_permissions", roleResourcePermissionHandler.GetRoleResourcePermissions)
+	s.app.Post("/role_resource_permissions", roleResourcePermissionHandler.CreateRoleResourcePermission)
+	s.app.Delete("/role_resource_permissions/:id", roleResourcePermissionHandler.DeleteRoleResourcePermission)
 }

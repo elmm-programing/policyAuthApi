@@ -3,9 +3,7 @@ package server
 import (
 	"context"
 	"database/sql"
-	"encoding/json"
 	"fmt"
-	"net/http"
 	"os"
 	"strings"
 
@@ -13,6 +11,7 @@ import (
 
 	"github.com/Nerzal/gocloak/v13"
 	"github.com/dgrijalva/jwt-go"
+	"github.com/gofiber/fiber/v2"
 	_ "github.com/jackc/pgx/v5/stdlib"
 )
 
@@ -30,31 +29,28 @@ func InitKeycloak() {
 	clientSecret = os.Getenv("KEYCLOAK_CLIENT_SECRET")
 }
 
-func JWTMiddleware(next http.Handler) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		authHeader := r.Header.Get("Authorization")
+func JWTMiddleware(next fiber.Handler) fiber.Handler {
+	return func(c *fiber.Ctx) error {
+		authHeader := c.Get("Authorization")
 		if authHeader == "" {
-			http.Error(w, "Authorization header is required", http.StatusUnauthorized)
-			return
+			return c.Status(fiber.StatusUnauthorized).SendString("Authorization header is required")
 		}
 
 		tokenString := strings.TrimPrefix(authHeader, "Bearer ")
 		rptResult, err := keycloakClient.RetrospectToken(context.Background(), tokenString, clientID, clientSecret, realm)
 		if err != nil || !*rptResult.Active {
-			http.Error(w, "Invalid token", http.StatusUnauthorized)
-			return
+			return c.Status(fiber.StatusUnauthorized).SendString("Invalid token")
 		}
 
 		claims := jwt.MapClaims{}
 		_, _, err = new(jwt.Parser).ParseUnverified(tokenString, claims)
 		if err != nil {
-			http.Error(w, "Invalid token", http.StatusUnauthorized)
-			return
+			return c.Status(fiber.StatusUnauthorized).SendString("Invalid token")
 		}
 
-		ctx := context.WithValue(r.Context(), "user", claims)
-		next.ServeHTTP(w, r.WithContext(ctx))
-	})
+		c.Locals("user", claims)
+		return next(c)
+	}
 }
 
 type AuthRequest struct {
@@ -66,18 +62,15 @@ type AuthResponse struct {
 	Token string `json:"token"`
 }
 
-func AuthHandler(w http.ResponseWriter, r *http.Request) {
+func AuthHandler(c *fiber.Ctx) error {
 	var authReq AuthRequest
-	err := json.NewDecoder(r.Body).Decode(&authReq)
-	if err != nil {
-		http.Error(w, "Invalid request payload", http.StatusBadRequest)
-		return
+	if err := c.BodyParser(&authReq); err != nil {
+		return c.Status(fiber.StatusBadRequest).SendString("Invalid request payload")
 	}
 
 	token, err := keycloakClient.Login(context.Background(), clientID, clientSecret, realm, authReq.Username, authReq.Password)
 	if err != nil {
-		http.Error(w, "Authentication failed", http.StatusUnauthorized)
-		return
+		return c.Status(fiber.StatusUnauthorized).SendString(fmt.Sprintf("Failed to authenticate user: %v", err))
 	}
 
 	// Check if the user exists in the database
@@ -91,29 +84,24 @@ func AuthHandler(w http.ResponseWriter, r *http.Request) {
 			authReq.Username, authReq.Password,
 		).Scan(&userID)
 		if err != nil {
-			http.Error(w, "Failed to add user to the database", http.StatusInternalServerError)
-			return
+			return c.Status(fiber.StatusInternalServerError).SendString("Failed to add user to the database")
 		}
 
 		// Assign default role to the new user (e.g., "user")
 		var roleID int
 		err = db.QueryRow("SELECT role_id FROM pds_roles WHERE role_name = $1", "user").Scan(&roleID)
 		if err != nil {
-			http.Error(w, "Failed to find default role", http.StatusInternalServerError)
-			return
+			return c.Status(fiber.StatusInternalServerError).SendString("Failed to find default role")
 		}
 
 		_, err = db.Exec("INSERT INTO pds_user_roles (user_id, role_id) VALUES ($1, $2)", userID, roleID)
 		if err != nil {
-			http.Error(w, "Failed to assign role to the user", http.StatusInternalServerError)
-			return
+			return c.Status(fiber.StatusInternalServerError).SendString("Failed to assign role to the user")
 		}
 	} else if err != nil {
-		http.Error(w, "Database error", http.StatusInternalServerError)
-		return
+		return c.Status(fiber.StatusInternalServerError).SendString("Database error")
 	}
 
 	authResp := AuthResponse{Token: token.AccessToken}
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(authResp)
+	return c.JSON(authResp)
 }
