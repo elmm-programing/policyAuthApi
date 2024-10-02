@@ -59,7 +59,7 @@ type RoleResourcePermissionHandler struct {
 }
 
 func (h *RoleResourcePermissionHandler) GetRoleResourcePermissions(c *fiber.Ctx) error {
-	rows, err := h.DB.Query("SELECT id, resource_role_permission_id, permission_id FROM pds_role_resource_permissions")
+	rows, err := h.DB.Query("SELECT id, resource_role_id, permission_id FROM pds_role_resource_permissions")
 	if err != nil {
 		return c.Status(fiber.StatusInternalServerError).SendString(err.Error())
 	}
@@ -68,7 +68,7 @@ func (h *RoleResourcePermissionHandler) GetRoleResourcePermissions(c *fiber.Ctx)
 	var roleResourcePermissions []relations.RoleResourcePermission
 	for rows.Next() {
 		var roleResourcePermission relations.RoleResourcePermission
-		if err := rows.Scan(&roleResourcePermission.ID, &roleResourcePermission.ResourceRolePermissionID, &roleResourcePermission.PermissionID); err != nil {
+		if err := rows.Scan(&roleResourcePermission.ID, &roleResourcePermission.ResourceRoleID, &roleResourcePermission.PermissionID); err != nil {
 			return c.Status(fiber.StatusInternalServerError).SendString(err.Error())
 		}
 		roleResourcePermissions = append(roleResourcePermissions, roleResourcePermission)
@@ -83,7 +83,7 @@ func (h *RoleResourcePermissionHandler) CreateRoleResourcePermission(c *fiber.Ct
 		return c.Status(fiber.StatusBadRequest).SendString(err.Error())
 	}
 
-	_, err := h.DB.Exec("INSERT INTO pds_role_resource_permissions (resource_role_permission_id, permission_id) VALUES ($1, $2)", roleResourcePermission.ResourceRolePermissionID, roleResourcePermission.PermissionID)
+	_, err := h.DB.Exec("INSERT INTO pds_role_resource_permissions (resource_role_id, permission_id) VALUES ($1, $2)", roleResourcePermission.ResourceRoleID, roleResourcePermission.PermissionID)
 	if err != nil {
 		return c.Status(fiber.StatusInternalServerError).SendString(err.Error())
 	}

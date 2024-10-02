@@ -51,8 +51,7 @@ CREATE TABLE IF NOT EXISTS pds_user_roles (
 CREATE TABLE IF NOT EXISTS pds_resource_role (
     id SERIAL PRIMARY KEY,
     resource_id INT REFERENCES pds_resources(resource_id),
-    role_id INT REFERENCES pds_roles(role_id),
-    PRIMARY KEY (resource_id, role_id)
+    role_id INT REFERENCES pds_roles(role_id)
 );
 
 -- Table for resource-permission mappings
@@ -65,7 +64,7 @@ CREATE TABLE IF NOT EXISTS pds_resource_permission (
 -- New table to store permissions for each role-resource mapping
 CREATE TABLE IF NOT EXISTS pds_role_resource_permissions (
     id SERIAL PRIMARY KEY,
-    resource_role_permission_id INT REFERENCES pds_role_resource_permissions(id),
+    resource_role_id INT REFERENCES pds_resource_role(id),
     permission_id INT REFERENCES pds_permissions(permission_id)
 );
 
@@ -93,41 +92,41 @@ type Service interface {
 	Close() error
 }
 
-type StructService struct {
-	DB *sql.DB
+type DatabaseService struct {
+	DB       *sql.DB
+	Database string
+	Password string
+	Username string
+	Port     string
+	Host     string
+	Schema   string
+  Instance *sql.DB
 }
 
-var (
-	database   = os.Getenv("DB_DATABASE")
-	password   = os.Getenv("DB_PASSWORD")
-	username   = os.Getenv("DB_USERNAME")
-	port       = os.Getenv("DB_PORT")
-	host       = os.Getenv("DB_HOST")
-	schema     = os.Getenv("DB_SCHEMA")
-	DBInstance *StructService
-)
-
-func New() Service {
-	// Reuse Connection
-	if DBInstance != nil {
-		return DBInstance
-	}
-	connStr := fmt.Sprintf("postgres://%s:%s@%s:%s/%s?sslmode=disable&search_path=%s", username, password, host, port, database, schema)
-  	fmt.Println("The connection string is ", connStr)
+func New() *DatabaseService {
+  dbServices := &DatabaseService{
+  Database: os.Getenv("DB_DATABASE"),
+  Password: os.Getenv("DB_PASSWORD"),
+    Username: os.Getenv("DB_USERNAME"),
+    Port:     os.Getenv("DB_PORT"),
+    Host:     os.Getenv("DB_HOST"),
+    Schema:   os.Getenv("DB_SCHEMA"),
+  }
+	connStr := fmt.Sprintf("postgres://%s:%s@%s:%s/%s?sslmode=disable&search_path=%s", dbServices.Username, dbServices.Password, dbServices.Host, dbServices.Port, dbServices.Database, dbServices.Schema)
+  fmt.Println("The connection string is ", connStr)
 
 	db, err := sql.Open("pgx", connStr)
 	if err != nil {
 		log.Fatal(err)
 	}
-	DBInstance = &StructService{
-		DB: db,
-	}
-	return DBInstance
+  dbServices.Instance = db
+	
+	return dbServices
 }
 
 // Health checks the health of the database connection by pinging the database.
 // It returns a map with keys indicating various health statistics.
-func (s *StructService) Health() map[string]string {
+func (s *DatabaseService) Health() map[string]string {
 	ctx, cancel := context.WithTimeout(context.Background(), 1*time.Second)
 	defer cancel()
 
@@ -180,7 +179,7 @@ func (s *StructService) Health() map[string]string {
 // It logs a message indicating the disconnection from the specific database.
 // If the connection is successfully closed, it returns nil.
 // If an error occurs while closing the connection, it returns the error.
-func (s *StructService) Close() error {
-	log.Printf("Disconnected from database: %s", database)
+func (s *DatabaseService) Close() error {
+	log.Printf("Disconnected from database: %s", s.Database)
 	return s.DB.Close()
 }

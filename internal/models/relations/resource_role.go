@@ -8,7 +8,10 @@ type ResourceRole struct {
 
 type RoleResourcePermission struct {
 	ID                      int `json:"id"`
-	ResourceRolePermissionID int `json:"resource_role_permission_id"`
+	ResourceRoleID int `json:"resource_role_id"`
 	PermissionID            int `json:"permission_id"`
 }
+
+
+
 

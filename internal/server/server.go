@@ -6,6 +6,7 @@ import (
 	"strconv"
 
 	"policyAuth/internal/database"
+	"policyAuth/internal/helpers"
 
 	"github.com/gofiber/fiber/v2"
 	_ "github.com/joho/godotenv/autoload"
@@ -13,7 +14,8 @@ import (
 
 type Server struct {
 	port int
-	db   database.Service
+	db   *database.DatabaseService
+  helpers  helpers.Helpers
 	app  *fiber.App
 }
 
@@ -22,7 +24,7 @@ func NewServer() *Server {
 
 	port, _ := strconv.Atoi(os.Getenv("PORT"))
 	dbService := database.New()
-	database.InitSchema(database.DBInstance.DB) // Initialize the database schema
+	database.InitSchema(dbService.Instance) // Initialize the database schema
 
 	app := fiber.New()
 
@@ -31,7 +33,6 @@ func NewServer() *Server {
 		db:   dbService,
 		app:  app,
 	}
-
 	server.RegisterRoutes()
 
 	return server

@@ -74,7 +74,7 @@ func AuthHandler(c *fiber.Ctx) error {
 	}
 
 	// Check if the user exists in the database
-	db := database.New().(*database.StructService).DB
+	db := database.New().Instance
 	var userID int
 	err = db.QueryRow("SELECT user_id FROM pds_users WHERE username = $1", authReq.Username).Scan(&userID)
 	if err == sql.ErrNoRows {
