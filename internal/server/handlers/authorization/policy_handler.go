@@ -53,13 +53,13 @@ func (h *ResourceDetailsHandler) GetRolesAndPermissionsForResource(c *fiber.Ctx)
 	if len(userRoles) == 0 {
 		return c.Status(fiber.StatusBadRequest).SendString("User has no roles")
 	}
-	query := `
+	resourceQuery := `
 		SELECT DISTINCT res.resource_id , res.resource_name,rr.id
 		FROM pds_resources res
 		JOIN pds_resource_role rr ON res.resource_id = rr.resource_id
 		JOIN pds_roles r ON rr.role_id = r.role_id
 		WHERE r.role_name = ANY($1)`
-	resourceRows, err := h.DB.Query(query, "{"+strings.Join(userRoles, ",")+"}")
+	resourceRows, err := h.DB.Query(resourceQuery, "{"+strings.Join(userRoles, ",")+"}")
 	if err != nil {
 		return c.Status(fiber.StatusInternalServerError).SendString(err.Error())
 	}
@@ -73,15 +73,36 @@ func (h *ResourceDetailsHandler) GetRolesAndPermissionsForResource(c *fiber.Ctx)
 		}
 		resources = append(resources, resource)
 	}
-	query2 := `
+	permissionsOfResourceQuery := `
 		SELECT DISTINCT pp.permission_name
 		FROM pds_permissions pp 
 		JOIN pds_resource_permission prp ON prp.permission_id = pp.permission_id
 		JOIN pds_role_resource_permissions rrp ON rrp.permission_id = pp.permission_id
 		where prp.resource_id = $1 and rrp.resource_role_id = $2`
+  rolesOfResourceQuery := `
+		SELECT DISTINCT pr.role_name 
+		FROM pds_resource_role prr 
+		JOIN pds_roles pr ON pr.role_id = prr.role_id 
+		where prr.resource_id = $1`
   for i, v := range resources {
-    
-	permissionsRows, err := h.DB.Query(query2, v.ResourceID,v.ResourceRoleId)
+ //Roles   
+rolesRows, err := h.DB.Query(rolesOfResourceQuery, v.ResourceID)
+    if err != nil {
+		return c.Status(fiber.StatusInternalServerError).SendString(err.Error())
+	}
+	defer rolesRows.Close()
+
+	for rolesRows.Next() {
+		var roleName string
+		if err := rolesRows.Scan(&roleName); err != nil {
+			return c.Status(fiber.StatusInternalServerError).SendString(err.Error())
+		}
+      resources[i].Roles = append(resources[i].Roles, roleName)
+	}
+
+
+  //Permissions
+	permissionsRows, err := h.DB.Query(permissionsOfResourceQuery, v.ResourceID,v.ResourceRoleId)
     if err != nil {
 		return c.Status(fiber.StatusInternalServerError).SendString(err.Error())
 	}
@@ -105,7 +126,7 @@ func (h *ResourceDetailsHandler) GetRolesAndPermissionsForResource(c *fiber.Ctx)
 	response := map[string]interface{}{}
 	for _, resource := range resources {
 		response[resource.ResourceName] = map[string]interface{}{
-			"roles": userRoles,
+			"roles": resource.Roles,
       "permissions": resource.Permissions,
 		}
 	}

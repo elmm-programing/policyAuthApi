@@ -10,6 +10,7 @@ type ResourceWithRoleRelation struct {
 	ResourceID   int    `json:"resource_id"`
 	ResourceName string `json:"resource_name"`
   Permissions []string `json:"resource_permissions"`
+  Roles []string `json:"resource_roles"`
 }
 
 
