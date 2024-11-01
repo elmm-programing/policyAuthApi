@@ -56,9 +56,9 @@ CREATE TABLE IF NOT EXISTS pds_resource_role (
 
 -- Table for resource-permission mappings
 CREATE TABLE IF NOT EXISTS pds_resource_permission (
+    id SERIAL PRIMARY KEY,
     resource_id INT REFERENCES pds_resources(resource_id),
-    permission_id INT REFERENCES pds_permissions(permission_id),
-    PRIMARY KEY (resource_id, permission_id)
+    permission_id INT REFERENCES pds_permissions(permission_id)
 );
 
 -- New table to store permissions for each role-resource mapping

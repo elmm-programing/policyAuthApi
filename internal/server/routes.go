@@ -51,11 +51,19 @@ func (s *Server) RegisterRoutes() {
 	s.app.Post("/resource_roles", resourceRoleHandler.CreateResourceRole)
 	s.app.Delete("/resource_roles/:id", resourceRoleHandler.DeleteResourceRole)
 
+  resourcePermissionHandler := &relations.ResourcePermissionHandler{DB: s.db.Instance}
+	// RoleResourcePermission routes
+	s.app.Get("/resource_permissions", resourcePermissionHandler.GetResourcePermissions)
+	s.app.Post("/resource_permissions", resourcePermissionHandler.CreateResourcePermission)
+	s.app.Delete("/resource_permissions/:id", resourcePermissionHandler.DeleteResourcePermission)
+
 	roleResourcePermissionHandler := &relations.RoleResourcePermissionHandler{DB: s.db.Instance}
 	// RoleResourcePermission routes
 	s.app.Get("/role_resource_permissions", roleResourcePermissionHandler.GetRoleResourcePermissions)
 	s.app.Post("/role_resource_permissions", roleResourcePermissionHandler.CreateRoleResourcePermission)
 	s.app.Delete("/role_resource_permissions/:id", roleResourcePermissionHandler.DeleteRoleResourcePermission)
+
+  
 
   resourceDetailsHandler := &authorization.ResourceDetailsHandler{DB: s.db.Instance}
 	s.app.Get("/resources/:username", resourceDetailsHandler.GetRolesAndPermissionsForResource)
