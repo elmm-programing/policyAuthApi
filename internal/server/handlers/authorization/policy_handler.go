@@ -6,7 +6,6 @@ import (
 
 	models "policyAuth/internal/models"
 	"github.com/gofiber/fiber/v2"
-	log "github.com/gofiber/fiber/v2/log"
 )
 
 type ResourceDetailsHandler struct {
@@ -117,10 +116,6 @@ rolesRows, err := h.DB.Query(rolesOfResourceQuery, v.ResourceID)
 	}
 
   }
-
-	// log.Print("{"+strings.Join(userRoles, ",")+"}")
-	log.Info(resources)
-	log.Info("{" + strings.Join(userRoles, ",") + "}")
 	
 	// Create the response structure
 	response := map[string]interface{}{}
