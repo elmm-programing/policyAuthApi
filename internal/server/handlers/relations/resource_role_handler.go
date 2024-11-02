@@ -65,7 +65,25 @@ type RoleResourcePermissionHandler struct {
 }
 
 func (h *RoleResourcePermissionHandler) GetRoleResourcePermissions(c *fiber.Ctx) error {
-	rows, err := h.DB.Query("SELECT id, resource_role_id, permission_id FROM pds_role_resource_permissions")
+	rows, err := h.DB.Query(`
+SELECT 
+    rrp.id, 
+    rrp.resource_role_id, 
+    r.resource_name, 
+    ro.role_name, 
+    rrp.permission_id, 
+    p.permission_name
+FROM 
+    pds_role_resource_permissions rrp
+JOIN 
+    pds_resource_role rr ON rrp.resource_role_id = rr.id
+JOIN 
+    pds_resources r ON rr.resource_id = r.resource_id
+JOIN 
+    pds_roles ro ON rr.role_id = ro.role_id
+JOIN 
+    pds_permissions p ON rrp.permission_id = p.permission_id;
+    `)
 	if err != nil {
 		return c.Status(fiber.StatusInternalServerError).SendString(err.Error())
 	}
@@ -74,7 +92,7 @@ func (h *RoleResourcePermissionHandler) GetRoleResourcePermissions(c *fiber.Ctx)
 	var roleResourcePermissions []relations.RoleResourcePermission
 	for rows.Next() {
 		var roleResourcePermission relations.RoleResourcePermission
-		if err := rows.Scan(&roleResourcePermission.ID, &roleResourcePermission.ResourceRoleID, &roleResourcePermission.PermissionID); err != nil {
+		if err := rows.Scan(&roleResourcePermission.ID, &roleResourcePermission.ResourceRoleID,&roleResourcePermission.ResourceName,&roleResourcePermission.RoleName, &roleResourcePermission.PermissionID,&roleResourcePermission.PermissionName); err != nil {
 			return c.Status(fiber.StatusInternalServerError).SendString(err.Error())
 		}
 		roleResourcePermissions = append(roleResourcePermissions, roleResourcePermission)
