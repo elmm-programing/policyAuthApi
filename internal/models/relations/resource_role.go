@@ -3,7 +3,9 @@ package relations
 type ResourceRole struct {
   ID         int `json:"id"`
 	ResourceID int `json:"resource_id"`
+	ResourceName string `json:"resource_name"`
 	RoleID     int `json:"role_id"`
+	RoleName string `json:"role_name"`
 }
 
 type RoleResourcePermission struct {

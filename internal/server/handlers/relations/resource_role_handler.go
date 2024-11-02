@@ -1,8 +1,9 @@
-package relations 
+package relations
 
 import (
 	"database/sql"
-	 "policyAuth/internal/models/relations"
+
+	"policyAuth/internal/models/relations"
 
 	"github.com/gofiber/fiber/v2"
 )
@@ -12,7 +13,12 @@ type ResourceRoleHandler struct {
 }
 
 func (h *ResourceRoleHandler) GetResourceRoles(c *fiber.Ctx) error {
-	rows, err := h.DB.Query("SELECT id, resource_id, role_id FROM pds_resource_role")
+	rows, err := h.DB.Query(`
+   SELECT rl.id, rl.resource_id,pre.resource_name , rl.role_id,pr.role_name 
+FROM pds_resource_role rl
+join pds_roles pr on pr.role_id = rl.role_id
+join pds_resources pre on pre.resource_id = rl.resource_id  
+    `)
 	if err != nil {
 		return c.Status(fiber.StatusInternalServerError).SendString(err.Error())
 	}
@@ -21,7 +27,7 @@ func (h *ResourceRoleHandler) GetResourceRoles(c *fiber.Ctx) error {
 	var resourceRoles []relations.ResourceRole
 	for rows.Next() {
 		var resourceRole relations.ResourceRole
-		if err := rows.Scan(&resourceRole.ID, &resourceRole.ResourceID, &resourceRole.RoleID); err != nil {
+		if err := rows.Scan(&resourceRole.ID, &resourceRole.ResourceID, &resourceRole.ResourceName, &resourceRole.RoleID, &resourceRole.RoleName); err != nil {
 			return c.Status(fiber.StatusInternalServerError).SendString(err.Error())
 		}
 		resourceRoles = append(resourceRoles, resourceRole)
@@ -100,5 +106,3 @@ func (h *RoleResourcePermissionHandler) DeleteRoleResourcePermission(c *fiber.Ct
 
 	return c.SendStatus(fiber.StatusNoContent)
 }
-
-
