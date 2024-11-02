@@ -45,7 +45,12 @@ func (h *UserRoleHandler) validateUserRole(c *fiber.Ctx, userID, roleID int) err
 }
 
 func (h *UserRoleHandler) GetUserRoles(c *fiber.Ctx) error {
-	rows, err := h.DB.Query("SELECT user_id, role_id FROM pds_user_roles")
+	rows, err := h.DB.Query(`
+    SELECT rl.user_id, pu.username , rl.role_id, pr.role_name 
+    FROM pds_user_roles rl
+    join pds_roles pr on pr.role_id = rl.role_id
+    join pds_users pu on pu.user_id = rl.user_id
+    `)
 	if err != nil {
 		return c.Status(fiber.StatusInternalServerError).SendString(err.Error())
 	}
@@ -54,7 +59,7 @@ func (h *UserRoleHandler) GetUserRoles(c *fiber.Ctx) error {
 	var userRoles []models.UserRole
 	for rows.Next() {
 		var userRole models.UserRole
-		if err := rows.Scan(&userRole.UserID, &userRole.RoleID); err != nil {
+		if err := rows.Scan(&userRole.UserID,&userRole.UserName, &userRole.RoleID,&userRole.RoleName); err != nil {
 			return c.Status(fiber.StatusInternalServerError).SendString(err.Error())
 		}
 		userRoles = append(userRoles, userRole)
