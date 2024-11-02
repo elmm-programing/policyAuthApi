@@ -2,6 +2,7 @@ package relations
 
 import (
 	"database/sql"
+
 	"policyAuth/internal/models/relations"
 
 	"github.com/gofiber/fiber/v2"
@@ -13,7 +14,19 @@ type ResourcePermissionHandler struct {
 }
 
 func (h *ResourcePermissionHandler) GetResourcePermissions(c *fiber.Ctx) error {
-	rows, err := h.DB.Query("SELECT resource_id, permission_id FROM pds_resource_permission")
+	rows, err := h.DB.Query(`
+SELECT 
+    rp.resource_id, 
+    r.resource_name, 
+    rp.permission_id, 
+    p.permission_name
+FROM 
+    pds_resource_permission rp
+JOIN 
+    pds_resources r ON rp.resource_id = r.resource_id
+JOIN 
+    pds_permissions p ON rp.permission_id = p.permission_id;
+    `)
 	if err != nil {
 		return c.Status(fiber.StatusInternalServerError).SendString(err.Error())
 	}
@@ -22,7 +35,7 @@ func (h *ResourcePermissionHandler) GetResourcePermissions(c *fiber.Ctx) error {
 	var resourcePermissions []relations.ResourcePermission
 	for rows.Next() {
 		var resourcePermission relations.ResourcePermission
-		if err := rows.Scan(&resourcePermission.ResourceID, &resourcePermission.PermissionID); err != nil {
+		if err := rows.Scan(&resourcePermission.ResourceID,&resourcePermission.ResourceName, &resourcePermission.PermissionID,&resourcePermission.PermissionName); err != nil {
 			return c.Status(fiber.StatusInternalServerError).SendString(err.Error())
 		}
 		resourcePermissions = append(resourcePermissions, resourcePermission)
@@ -54,4 +67,3 @@ func (h *ResourcePermissionHandler) DeleteResourcePermission(c *fiber.Ctx) error
 
 	return c.SendStatus(fiber.StatusNoContent)
 }
-
