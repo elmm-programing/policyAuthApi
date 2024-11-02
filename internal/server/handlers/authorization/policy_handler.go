@@ -3,13 +3,27 @@ package authorization
 import (
 	"database/sql"
 	"strings"
-
+  hp "policyAuth/internal/helpers"
 	models "policyAuth/internal/models"
+
 	"github.com/gofiber/fiber/v2"
 )
 
 type ResourceDetailsHandler struct {
 	DB *sql.DB
+}
+
+type authResponse struct {
+	Roles       []string
+	Permissions []string
+}
+
+func Keys(shs map[string]struct{}) []string {
+	keys := make([]string, 0, len(shs))
+	for key := range shs {
+		keys = append(keys, key)
+	}
+	return keys
 }
 
 func (h *ResourceDetailsHandler) userExists(username string) (bool, int, error) {
@@ -66,8 +80,8 @@ func (h *ResourceDetailsHandler) GetRolesAndPermissionsForResource(c *fiber.Ctx)
 
 	var resources []models.ResourceWithRoleRelation
 	for resourceRows.Next() {
-  var resource models.ResourceWithRoleRelation
-		if err := resourceRows.Scan(&resource.ResourceID,&resource.ResourceName,&resource.ResourceRoleId); err != nil {
+		var resource models.ResourceWithRoleRelation
+		if err := resourceRows.Scan(&resource.ResourceID, &resource.ResourceName, &resource.ResourceRoleId); err != nil {
 			return c.Status(fiber.StatusInternalServerError).SendString(err.Error())
 		}
 		resources = append(resources, resource)
@@ -78,53 +92,62 @@ func (h *ResourceDetailsHandler) GetRolesAndPermissionsForResource(c *fiber.Ctx)
 		JOIN pds_resource_permission prp ON prp.permission_id = pp.permission_id
 		JOIN pds_role_resource_permissions rrp ON rrp.permission_id = pp.permission_id
 		where prp.resource_id = $1 and rrp.resource_role_id = $2`
-  rolesOfResourceQuery := `
+	rolesOfResourceQuery := `
 		SELECT DISTINCT pr.role_name 
 		FROM pds_resource_role prr 
 		JOIN pds_roles pr ON pr.role_id = prr.role_id 
 		where prr.resource_id = $1`
-  for i, v := range resources {
- //Roles   
-rolesRows, err := h.DB.Query(rolesOfResourceQuery, v.ResourceID)
-    if err != nil {
-		return c.Status(fiber.StatusInternalServerError).SendString(err.Error())
-	}
-	defer rolesRows.Close()
-
-	for rolesRows.Next() {
-		var roleName string
-		if err := rolesRows.Scan(&roleName); err != nil {
+	for i, v := range resources {
+		// Roles
+		rolesRows, err := h.DB.Query(rolesOfResourceQuery, v.ResourceID)
+		if err != nil {
 			return c.Status(fiber.StatusInternalServerError).SendString(err.Error())
 		}
-      resources[i].Roles = append(resources[i].Roles, roleName)
-	}
+		defer rolesRows.Close()
 
+		for rolesRows.Next() {
+			var roleName string
+			if err := rolesRows.Scan(&roleName); err != nil {
+				return c.Status(fiber.StatusInternalServerError).SendString(err.Error())
+			}
+			resources[i].Roles = append(resources[i].Roles, roleName)
+		}
 
-  //Permissions
-	permissionsRows, err := h.DB.Query(permissionsOfResourceQuery, v.ResourceID,v.ResourceRoleId)
-    if err != nil {
-		return c.Status(fiber.StatusInternalServerError).SendString(err.Error())
-	}
-	defer permissionsRows.Close()
-
-	for permissionsRows.Next() {
-		var permissionsName string
-		if err := permissionsRows.Scan(&permissionsName); err != nil {
+		// Permissions
+		permissionsRows, err := h.DB.Query(permissionsOfResourceQuery, v.ResourceID, v.ResourceRoleId)
+		if err != nil {
 			return c.Status(fiber.StatusInternalServerError).SendString(err.Error())
 		}
-      resources[i].Permissions = append(resources[i].Permissions, permissionsName)
+		defer permissionsRows.Close()
+
+		for permissionsRows.Next() {
+			var permissionsName string
+			if err := permissionsRows.Scan(&permissionsName); err != nil {
+				return c.Status(fiber.StatusInternalServerError).SendString(err.Error())
+			}
+			resources[i].Permissions = append(resources[i].Permissions, permissionsName)
+		}
+
 	}
 
-  }
-	
-	// Create the response structure
-	response := map[string]interface{}{}
+
+	response := map[string]authResponse{}
 	for _, resource := range resources {
-		response[resource.ResourceName] = map[string]interface{}{
-			"roles": resource.Roles,
-      "permissions": resource.Permissions,
+    val, ok := response[resource.ResourceName]
+    if ok {
+      response[resource.ResourceName] = authResponse{
+        Roles: hp.UniqueStrings(append(val.Roles, resource.Roles...)),
+        Permissions: hp.UniqueStrings(append(val.Permissions, resource.Permissions...)),
+      } 
+
+    }else{
+    response[resource.ResourceName] = authResponse{
+			Roles:       resource.Roles,
+			Permissions: resource.Permissions,
 		}
+    }
 	}
+
 
 	return c.JSON(response)
 }
