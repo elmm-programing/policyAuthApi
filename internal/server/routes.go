@@ -11,28 +11,28 @@ func (s *Server) RegisterRoutes() {
 	s.app.Get("/health", JWTMiddleware(s.helpers.HealthHandler))
 	s.app.Post("/auth", AuthHandler)
 
-	userHandler := &handlers.UserHandler{DB: s.db.Instance}
+	userHandler := handlers.NewUserHandler(s.db.Instance)
 	// User routes
 	s.app.Get("/users", userHandler.GetUsers)
 	s.app.Post("/users", userHandler.CreateUser)
 	s.app.Put("/users", userHandler.UpdateUser)
 	s.app.Delete("/users", userHandler.DeleteUser)
 
-	roleHandler := &handlers.RoleHandler{DB: s.db.Instance}
+	roleHandler := handlers.NewRoleHandler(s.db.Instance)
 	// Role routes
 	s.app.Get("/roles", roleHandler.GetRoles)
 	s.app.Post("/roles", roleHandler.CreateRole)
 	s.app.Put("/roles", roleHandler.UpdateRole)
 	s.app.Delete("/roles", roleHandler.DeleteRole)
 
-	permissionHandler := &handlers.PermissionHandler{DB: s.db.Instance}
+	permissionHandler := handlers.NewPermissionHandler(s.db.Instance)
 	// Permission routes
 	s.app.Get("/permissions", permissionHandler.GetPermissions)
 	s.app.Post("/permissions", permissionHandler.CreatePermission)
 	s.app.Put("/permissions", permissionHandler.UpdatePermission)
 	s.app.Delete("/permissions", permissionHandler.DeletePermission)
 
-	resourceHandler := &handlers.ResourceHandler{DB: s.db.Instance}
+	resourceHandler := handlers.NewResourceHandler(s.db.Instance)
 	// Resource routes
 	s.app.Get("/resources", resourceHandler.GetResources)
 	s.app.Post("/resources", resourceHandler.CreateResource)
