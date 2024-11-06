@@ -7,7 +7,7 @@ import (
 
 	"policyAuth/internal/database"
 	"policyAuth/internal/helpers"
-
+  "github.com/gofiber/fiber/v2/middleware/cors"
 	"github.com/gofiber/fiber/v2"
 	_ "github.com/joho/godotenv/autoload"
 )
@@ -27,6 +27,11 @@ func NewServer() *Server {
 	database.InitSchema(dbService.Instance) // Initialize the database schema
 
 	app := fiber.New()
+  app.Use(cors.New(cors.Config{
+    AllowOrigins: "*",
+    AllowHeaders: "*",
+    AllowMethods: "*",
+  }))
 
 	server := &Server{
 		port: port,
