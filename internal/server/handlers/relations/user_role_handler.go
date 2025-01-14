@@ -2,99 +2,135 @@ package relations
 
 import (
 	"database/sql"
-
 	models "policyAuth/internal/models/relations"
+	services "policyAuth/internal/services/relations"
 
 	"github.com/gofiber/fiber/v2"
 )
 
 type UserRoleHandler struct {
-	DB *sql.DB
+    UserRoleService services.UserRoleService
 }
 
-func (h *UserRoleHandler) userExists(userID int) (bool, error) {
-	var exists bool
-	err := h.DB.QueryRow("SELECT EXISTS(SELECT 1 FROM pds_users WHERE user_id=$1)", userID).Scan(&exists)
-	return exists, err
+func NewUserRoleHandler(DB *sql.DB) *UserRoleHandler  {
+  return &UserRoleHandler{services.UserRoleService{DB: DB}}
+  
 }
 
-func (h *UserRoleHandler) roleExists(roleID int) (bool, error) {
-	var exists bool
-	err := h.DB.QueryRow("SELECT EXISTS(SELECT 1 FROM pds_roles WHERE role_id=$1)", roleID).Scan(&exists)
-	return exists, err
+func (h *UserRoleHandler) validateUserRoleById(c *fiber.Ctx, userID, roleID int) error {
+    userExists, err := h.UserRoleService.UserExistsById(userID)
+    if err != nil {
+        return c.Status(fiber.StatusInternalServerError).SendString(err.Error())
+    }
+    if !userExists {
+        return c.Status(fiber.StatusBadRequest).SendString("User does not exist")
+    }
+
+    roleExists, err := h.UserRoleService.RoleExistsById(roleID)
+    if err != nil {
+        return c.Status(fiber.StatusInternalServerError).SendString(err.Error())
+    }
+    if !roleExists {
+        return c.Status(fiber.StatusBadRequest).SendString("Role does not exist")
+    }
+
+    return nil
 }
 
-func (h *UserRoleHandler) validateUserRole(c *fiber.Ctx, userID, roleID int) error {
-	userExists, err := h.userExists(userID)
-	if err != nil {
-		return c.Status(fiber.StatusInternalServerError).SendString(err.Error())
-	}
-	if !userExists {
-		return c.Status(fiber.StatusBadRequest).SendString("User does not exist")
-	}
+func (h *UserRoleHandler) validateUserRoleByName(c *fiber.Ctx, userName, roleName string) error {
+    userExists, err := h.UserRoleService.UserExistsByName(userName)
+    if err != nil {
+        return c.Status(fiber.StatusInternalServerError).SendString(err.Error())
+    }
+    if !userExists {
+        return c.Status(fiber.StatusBadRequest).SendString("User does not exist")
+    }
 
-	roleExists, err := h.roleExists(roleID)
-	if err != nil {
-		return c.Status(fiber.StatusInternalServerError).SendString(err.Error())
-	}
-	if !roleExists {
-		return c.Status(fiber.StatusBadRequest).SendString("Role does not exist")
-	}
+    roleExists, err := h.UserRoleService.RoleExistsByName(roleName)
+    if err != nil {
+        return c.Status(fiber.StatusInternalServerError).SendString(err.Error())
+    }
+    if !roleExists {
+        return c.Status(fiber.StatusBadRequest).SendString("Role does not exist")
+    }
 
-	return nil
+    return nil
 }
 
 func (h *UserRoleHandler) GetUserRoles(c *fiber.Ctx) error {
-	rows, err := h.DB.Query("SELECT user_id, role_id FROM pds_user_roles")
-	if err != nil {
-		return c.Status(fiber.StatusInternalServerError).SendString(err.Error())
-	}
-	defer rows.Close()
+    userRoles, err := h.UserRoleService.GetUserRoles()
+    if err != nil {
+        return c.Status(fiber.StatusInternalServerError).SendString(err.Error())
+    }
 
-	var userRoles []models.UserRole
-	for rows.Next() {
-		var userRole models.UserRole
-		if err := rows.Scan(&userRole.UserID, &userRole.RoleID); err != nil {
-			return c.Status(fiber.StatusInternalServerError).SendString(err.Error())
-		}
-		userRoles = append(userRoles, userRole)
-	}
-
-	return c.JSON(userRoles)
+    return c.JSON(userRoles)
 }
 
-func (h *UserRoleHandler) CreateUserRole(c *fiber.Ctx) error {
-	var userRole models.UserRole
-	if err := c.BodyParser(&userRole); err != nil {
-		return c.Status(fiber.StatusBadRequest).SendString(err.Error())
-	}
+func (h *UserRoleHandler) CreateUserRoleById(c *fiber.Ctx) error {
+    var userRole models.UserRole
+    if err := c.BodyParser(&userRole); err != nil {
+        return c.Status(fiber.StatusBadRequest).SendString(err.Error())
+    }
 
-	if err := h.validateUserRole(c, userRole.UserID, userRole.RoleID); err != nil {
-		return err
-	}
+    if err := h.validateUserRoleById(c, userRole.UserID, userRole.RoleID); err != nil {
+        return err
+    }
 
-	_, err := h.DB.Exec("INSERT INTO pds_user_roles (user_id, role_id) VALUES ($1, $2)", userRole.UserID, userRole.RoleID)
-	if err != nil {
-		return c.Status(fiber.StatusInternalServerError).SendString(err.Error())
-	}
+    if err := h.UserRoleService.CreateUserRole(userRole); err != nil {
+        return c.Status(fiber.StatusInternalServerError).SendString(err.Error())
+    }
 
-	return c.JSON(userRole)
+    return c.JSON(userRole)
 }
 
-func (h *UserRoleHandler) DeleteUserRole(c *fiber.Ctx) error {
-	var userRole models.UserRole
-	if err := c.BodyParser(&userRole); err != nil {
-		return c.Status(fiber.StatusBadRequest).SendString(err.Error())
-	}
+func (h *UserRoleHandler) DeleteUserRoleById(c *fiber.Ctx) error {
+    var userRole models.UserRole
+    if err := c.BodyParser(&userRole); err != nil {
+        return c.Status(fiber.StatusBadRequest).SendString(err.Error())
+    }
 
-	if err := h.validateUserRole(c, userRole.UserID, userRole.RoleID); err != nil {
-		return err
-	}
+    if err := h.validateUserRoleById(c, userRole.UserID, userRole.RoleID); err != nil {
+        return err
+    }
 
-	_, err := h.DB.Exec("DELETE FROM pds_user_roles WHERE user_id=$1 AND role_id=$2", userRole.UserID, userRole.RoleID)
-	if err != nil {
-		return c.Status(fiber.StatusInternalServerError).SendString(err.Error())
-	}
+    if err := h.UserRoleService.DeleteUserRole(userRole); err != nil {
+        return c.Status(fiber.StatusInternalServerError).SendString(err.Error())
+    }
 
-	return c.SendStatus(fiber.StatusNoContent)
+    return c.SendStatus(fiber.StatusNoContent)
 }
+
+func (h *UserRoleHandler) CreateUserRoleByName(c *fiber.Ctx) error {
+    var userRole models.UserRole
+    if err := c.BodyParser(&userRole); err != nil {
+        return c.Status(fiber.StatusBadRequest).SendString(err.Error())
+    }
+
+    if err := h.validateUserRoleByName(c, userRole.UserName, userRole.RoleName); err != nil {
+        return err
+    }
+
+    if err := h.UserRoleService.CreateUserRole(userRole); err != nil {
+        return c.Status(fiber.StatusInternalServerError).SendString(err.Error())
+    }
+
+    return c.JSON(userRole)
+}
+
+func (h *UserRoleHandler) DeleteUserRoleByName(c *fiber.Ctx) error {
+    var userRole models.UserRole
+    if err := c.BodyParser(&userRole); err != nil {
+        return c.Status(fiber.StatusBadRequest).SendString(err.Error())
+    }
+
+    if err := h.validateUserRoleById(c, userRole.UserID, userRole.RoleID); err != nil {
+        return err
+    }
+
+    if err := h.UserRoleService.DeleteUserRole(userRole); err != nil {
+        return c.Status(fiber.StatusInternalServerError).SendString(err.Error())
+    }
+
+    return c.SendStatus(fiber.StatusNoContent)
+}
+
