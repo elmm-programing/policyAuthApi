@@ -76,14 +76,12 @@ query := `
 
 
 	// Create the response structure
-	response := map[string]interface{}{
-	}
+  response := make(map[string][]string)
   for _,resource := range resources {
-    response[resource] = map[string]interface{}{
-      "roles": userRoles,
-    }
+    response[resource] = userRoles
 
   }
 
 	return c.JSON(response)
+  // return c.Status(fiber.StatusNotFound).SendString("Not found")
 }

@@ -3,20 +3,20 @@ package server
 import (
 	"fmt"
 	"os"
-	"strconv"
-
 	"policyAuth/internal/database"
 	"policyAuth/internal/helpers"
+	"strconv"
 
 	"github.com/gofiber/fiber/v2"
+	"github.com/gofiber/fiber/v2/middleware/cors"
 	_ "github.com/joho/godotenv/autoload"
 )
 
 type Server struct {
-	port int
-	db   *database.DatabaseService
-  helpers  helpers.Helpers
-	app  *fiber.App
+	port    int
+	db      *database.DatabaseService
+	helpers helpers.Helpers
+	app     *fiber.App
 }
 
 func NewServer() *Server {
@@ -27,6 +27,11 @@ func NewServer() *Server {
 	database.InitSchema(dbService.Instance) // Initialize the database schema
 
 	app := fiber.New()
+	app.Use(cors.New(cors.Config{
+		AllowOrigins:     "*",
+		AllowHeaders:     "*",
+		AllowMethods:     "*",
+	}))
 
 	server := &Server{
 		port: port,
